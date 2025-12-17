@@ -1,10 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { Search, PenLine } from 'lucide-react';
+import { Search, PenLine, FileText } from 'lucide-react';
 import AuthButton from './AuthButton';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Header() {
+  const { user } = useAuth();
+
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-secondary/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -15,14 +18,24 @@ export default function Header() {
           </Link>
 
           {/* Navigation */}
-          <nav className="flex items-center space-x-4">
+          <nav className="flex items-center space-x-2 sm:space-x-4">
             <Link
               href="/search"
-              className="flex items-center space-x-2 text-secondary hover:text-primary transition-colors duration-200 px-4 py-2 rounded-lg hover:bg-surface"
+              className="flex items-center space-x-2 text-secondary hover:text-primary transition-colors duration-200 px-3 py-2 rounded-lg hover:bg-surface"
             >
               <Search className="w-5 h-5" />
               <span className="hidden sm:inline">Search</span>
             </Link>
+            
+            {user && (
+              <Link
+                href="/my-posts"
+                className="flex items-center space-x-2 text-secondary hover:text-primary transition-colors duration-200 px-3 py-2 rounded-lg hover:bg-surface"
+              >
+                <FileText className="w-5 h-5" />
+                <span className="hidden sm:inline">My Posts</span>
+              </Link>
+            )}
             
             <Link
               href="/post/new"
