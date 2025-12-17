@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { Building2, AlertCircle } from 'lucide-react';
+import { Building2, AlertCircle, Search, Filter, X } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import CultureSnapshot from '@/components/CultureSnapshot';
 import PostCard from '@/components/PostCard';
 import ReportModal from '@/components/ReportModal';
+import { PRIMARY_CATEGORIES, SENTIMENTS } from '@/lib/constants';
 
 interface Company {
   id: string;
@@ -44,6 +45,48 @@ export default function CompanyPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reportingPostId, setReportingPostId] = useState<string | null>(null);
+  
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedSentiment, setSelectedSentiment] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter posts based on search and filters
+  const filteredPosts = useMemo(() => {
+    return posts.filter(post => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = 
+          post.content.toLowerCase().includes(query) ||
+          post.primary_category.toLowerCase().includes(query) ||
+          (post.sub_category && post.sub_category.toLowerCase().includes(query)) ||
+          (post.team_function && post.team_function.toLowerCase().includes(query));
+        if (!matchesSearch) return false;
+      }
+
+      // Category filter
+      if (selectedCategory && post.primary_category !== selectedCategory) {
+        return false;
+      }
+
+      // Sentiment filter
+      if (selectedSentiment && post.sentiment !== selectedSentiment) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [posts, searchQuery, selectedCategory, selectedSentiment]);
+
+  const hasActiveFilters = searchQuery || selectedCategory || selectedSentiment;
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSelectedCategory('');
+    setSelectedSentiment('');
+  };
 
   useEffect(() => {
     if (slug) {
@@ -189,26 +232,129 @@ export default function CompanyPage() {
 
           {/* Posts Feed */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-semibold">Anonymous Posts</h2>
               <span className="text-sm text-secondary">
-                {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+                {filteredPosts.length} of {posts.length} {posts.length === 1 ? 'post' : 'posts'}
               </span>
             </div>
 
-            {posts.length > 0 ? (
+            {/* Search and Filters */}
+            {posts.length > 0 && (
+              <div className="mb-6 space-y-4">
+                {/* Search Bar */}
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-secondary" />
+                  <input
+                    type="text"
+                    placeholder="Search posts by keyword..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="input-field w-full pl-12 pr-4"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-secondary hover:text-primary"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter Toggle */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                      showFilters || hasActiveFilters
+                        ? 'bg-accent/10 text-accent'
+                        : 'bg-surface-hover text-secondary hover:text-primary'
+                    }`}
+                  >
+                    <Filter className="w-4 h-4" />
+                    Filters
+                    {hasActiveFilters && (
+                      <span className="w-2 h-2 bg-accent rounded-full" />
+                    )}
+                  </button>
+
+                  {hasActiveFilters && (
+                    <button
+                      onClick={clearFilters}
+                      className="text-sm text-secondary hover:text-primary transition-colors"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter Options */}
+                {showFilters && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-surface rounded-lg border border-border">
+                    {/* Category Filter */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Category</label>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="input-field w-full"
+                      >
+                        <option value="">All categories</option>
+                        {PRIMARY_CATEGORIES.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Sentiment Filter */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Sentiment</label>
+                      <select
+                        value={selectedSentiment}
+                        onChange={(e) => setSelectedSentiment(e.target.value)}
+                        className="input-field w-full"
+                      >
+                        <option value="">All sentiments</option>
+                        {SENTIMENTS.map((sent) => (
+                          <option key={sent.id} value={sent.id}>
+                            {sent.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {filteredPosts.length > 0 ? (
               <div className="space-y-6">
-                {posts.map((post) => (
+                {filteredPosts.map((post) => (
                   <PostCard
                     key={post.id}
                     post={{
                       ...post,
                       created_at: new Date(post.created_at),
                     }}
+                    companySlug={slug}
+                    companyName={company?.name}
                     onVote={handleVote}
                     onReport={(postId) => setReportingPostId(postId)}
                   />
                 ))}
+              </div>
+            ) : posts.length > 0 ? (
+              <div className="card text-center py-12">
+                <Search className="w-12 h-12 text-secondary mx-auto mb-4 opacity-50" />
+                <p className="text-secondary mb-4">
+                  No posts match your search or filters.
+                </p>
+                <button onClick={clearFilters} className="btn-secondary">
+                  Clear filters
+                </button>
               </div>
             ) : (
               <div className="card text-center py-12">
