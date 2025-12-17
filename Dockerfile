@@ -10,7 +10,8 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps --no-audit --no-fund
+# Use --ignore-scripts to skip postinstall (prisma generate) - we'll run it in builder stage
+RUN npm install --legacy-peer-deps --no-audit --no-fund --ignore-scripts
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder

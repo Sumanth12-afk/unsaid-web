@@ -1,28 +1,51 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, User, getRedirectResult } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
-import { LogIn, LogOut, User as UserIcon } from 'lucide-react';
+import { LogIn, LogOut, User as UserIcon, Loader2 } from 'lucide-react';
 
 export default function AuthButton() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
+    // Check for redirect result first
+    getRedirectResult(auth).catch((error) => {
+      console.error('Redirect result error:', error);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
+      setSigningIn(false);
     });
 
     return () => unsubscribe();
   }, []);
 
   const handleSignIn = async () => {
+    setSigningIn(true);
     try {
+      // Try popup first (works on desktop)
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error('Sign in error:', error);
+    } catch (error: unknown) {
+      const firebaseError = error as { code?: string };
+      console.error('Popup sign in failed, trying redirect:', error);
+      // If popup fails (blocked, mobile, etc.), use redirect
+      if (firebaseError.code === 'auth/popup-blocked' || 
+          firebaseError.code === 'auth/popup-closed-by-user' ||
+          firebaseError.code === 'auth/cancelled-popup-request') {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch (redirectError) {
+          console.error('Redirect sign in error:', redirectError);
+          setSigningIn(false);
+        }
+      } else {
+        setSigningIn(false);
+      }
     }
   };
 
@@ -61,10 +84,20 @@ export default function AuthButton() {
   return (
     <button
       onClick={handleSignIn}
-      className="btn-secondary flex items-center gap-2"
+      disabled={signingIn}
+      className="btn-secondary flex items-center gap-2 disabled:opacity-50"
     >
-      <LogIn className="w-4 h-4" />
-      <span>Login (Optional)</span>
+      {signingIn ? (
+        <>
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span>Signing in...</span>
+        </>
+      ) : (
+        <>
+          <LogIn className="w-4 h-4" />
+          <span>Login (Optional)</span>
+        </>
+      )}
     </button>
   );
 }

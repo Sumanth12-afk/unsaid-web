@@ -1,16 +1,32 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogIn, Shield, Lock, Eye } from 'lucide-react';
+import { LogIn, Shield, Lock, Eye, Loader2 } from 'lucide-react';
 import Header from '@/components/Header';
 
 export default function LoginPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const [signingIn, setSigningIn] = useState(false);
+
+  useEffect(() => {
+    // Check for redirect result when page loads
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/';
+          router.push(returnUrl);
+        }
+      })
+      .catch((error) => {
+        console.error('Redirect result error:', error);
+        setSigningIn(false);
+      });
+  }, [router]);
 
   useEffect(() => {
     // Redirect if already logged in
@@ -21,12 +37,29 @@ export default function LoginPage() {
   }, [user, router]);
 
   const handleGoogleLogin = async () => {
+    setSigningIn(true);
     try {
+      // Try popup first (works on desktop)
       await signInWithPopup(auth, googleProvider);
       // User will be redirected by useEffect after login
-    } catch (error) {
-      console.error('Login error:', error);
-      alert('Failed to login. Please try again.');
+    } catch (error: unknown) {
+      const firebaseError = error as { code?: string };
+      console.error('Popup login failed, trying redirect:', error);
+      // If popup fails, use redirect
+      if (firebaseError.code === 'auth/popup-blocked' || 
+          firebaseError.code === 'auth/popup-closed-by-user' ||
+          firebaseError.code === 'auth/cancelled-popup-request') {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch (redirectError) {
+          console.error('Redirect login error:', redirectError);
+          setSigningIn(false);
+          alert('Failed to login. Please try again.');
+        }
+      } else {
+        setSigningIn(false);
+        alert('Failed to login. Please try again.');
+      }
     }
   };
 
@@ -84,10 +117,20 @@ export default function LoginPage() {
             {/* Login Button */}
             <button
               onClick={handleGoogleLogin}
-              className="btn-primary w-full flex items-center justify-center gap-3 text-lg py-4"
+              disabled={signingIn}
+              className="btn-primary w-full flex items-center justify-center gap-3 text-lg py-4 disabled:opacity-50"
             >
-              <LogIn className="w-6 h-6" />
-              Continue with Google
+              {signingIn ? (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  <LogIn className="w-6 h-6" />
+                  Continue with Google
+                </>
+              )}
             </button>
 
             <p className="text-xs text-secondary mt-4">
