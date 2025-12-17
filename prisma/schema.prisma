@@ -1,0 +1,161 @@
+// Prisma Schema for UNSAID
+// PostgreSQL database with focus on anonymity and trust
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model - Stores PRIVATE authentication data only
+// NEVER expose firebase_uid, email, or email_hash publicly
+model User {
+  id           String   @id @default(cuid())
+  firebase_uid String?  @unique // Optional - for logged-in users
+  email_hash   String?  @unique // Hashed email for duplicate detection
+  trust_score  Float    @default(0.5) // 0.0 to 1.0 - affects post visibility
+  is_verified  Boolean  @default(false) // Email verification status
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  posts   Post[]
+  votes   Vote[]
+  reports Report[]
+
+  @@index([firebase_uid])
+  @@index([trust_score])
+}
+
+// Company Model
+model Company {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  industry    String?
+  location    String?
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  posts Post[]
+  polls Poll[]
+
+  @@index([slug])
+  @@index([name])
+}
+
+// Post Model - Anonymous workplace opinions
+model Post {
+  id          String   @id @default(cuid())
+  company_id  String
+  user_id     String? // Nullable for fully anonymous posts
+  
+  // Categorization
+  primary_category   String // "manager", "wlb", "salary", "layoffs", "hr", "culture", "hiring"
+  sub_category       String? // "micromanagement", "credit_stealing", etc.
+  
+  // Context
+  employment_status  String // "current", "past", "interviewing"
+  team_function      String? // "Engineering", "Sales", etc.
+  location          String?
+  
+  // Sentiment
+  sentiment         String // "positive", "neutral", "negative"
+  
+  // Content
+  content           String // 150-1500 characters
+  
+  // Validation metrics
+  matches_count     Int @default(0) // 👍 Matches my experience
+  not_matches_count Int @default(0) // 👎 Doesn't match
+  
+  // Topic reactions
+  common_issue      Int @default(0) // ⚠️ Common issue
+  recent            Int @default(0) // 🕒 Happened recently
+  still_happening   Int @default(0) // 🔁 Still happening
+  management_driven Int @default(0) // 🧠 Management-driven
+  
+  // Moderation
+  is_published      Boolean  @default(false)
+  is_hidden         Boolean  @default(false)
+  reports_count     Int      @default(0)
+  publish_at        DateTime? // Delayed publishing
+  
+  // Trust & visibility
+  visibility_score  Float    @default(0.0) // Calculated from validations
+  
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  
+  votes   Vote[]
+  reports Report[]
+
+  @@index([company_id])
+  @@index([user_id])
+  @@index([primary_category])
+  @@index([sentiment])
+  @@index([employment_status])
+  @@index([is_published, is_hidden])
+  @@index([visibility_score])
+  @@index([created_at])
+}
+
+// Vote Model - For validation actions
+model Vote {
+  id         String   @id @default(cuid())
+  post_id    String
+  user_id    String? // Nullable for anonymous votes
+  device_id  String? // Browser fingerprint for anonymous voting
+  vote_type  String // "matches", "not_matches", "common_issue", "recent", "still_happening", "management_driven"
+  created_at DateTime @default(now())
+
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@unique([post_id, user_id, vote_type])
+  @@unique([post_id, device_id, vote_type])
+  @@index([post_id])
+  @@index([user_id])
+  @@index([device_id])
+}
+
+// Poll Model - Simple yes/no or multiple choice
+model Poll {
+  id          String   @id @default(cuid())
+  company_id  String
+  question    String
+  poll_type   String // "yes_no", "multiple_choice"
+  options     Json // Array of options for multiple choice
+  votes       Json @default("{}") // Object mapping option -> vote count
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id])
+}
+
+// Report Model - For flagging inappropriate content
+model Report {
+  id         String   @id @default(cuid())
+  post_id    String
+  user_id    String? // Nullable for anonymous reports
+  reason     String // "harassment", "fake", "confidential", "spam", "other"
+  details    String?
+  status     String   @default("pending") // "pending", "reviewed", "actioned", "dismissed"
+  created_at DateTime @default(now())
+
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([post_id])
+  @@index([user_id])
+  @@index([status])
+}
+
