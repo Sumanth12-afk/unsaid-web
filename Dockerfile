@@ -71,11 +71,13 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copy necessary files
-COPY --from=builder /app/public ./public
+# Copy public folder if it exists (use conditional copy)
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# Copy public folder (create empty if needed)
+COPY --from=builder /app/public ./public
 
 # Set correct permissions
 RUN chown -R nextjs:nodejs /app
