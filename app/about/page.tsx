@@ -53,10 +53,10 @@ export default function AboutPage() {
                   <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center mb-4">
                     <Eye className="w-6 h-6 text-accent" />
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">Patterns Over Drama</h3>
-                  <p className="text-secondary text-sm leading-relaxed">
-                    We surface validated patterns, not viral complaints. Validation > likes.
-                  </p>
+                <h3 className="text-lg font-semibold mb-2">Patterns Over Drama</h3>
+                <p className="text-secondary text-sm leading-relaxed">
+                  We surface validated patterns, not viral complaints. Validation &gt; likes.
+                </p>
                 </div>
 
                 <div className="card">
