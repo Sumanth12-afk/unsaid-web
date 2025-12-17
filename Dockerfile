@@ -2,14 +2,22 @@
 
 # Stage 1: Dependencies
 FROM node:20-alpine AS deps
+
+# Install libc6-compat for Alpine (needed for some npm packages)
+RUN apk add --no-cache libc6-compat
+
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder
+
+# Install libc6-compat for Alpine
+RUN apk add --no-cache libc6-compat
+
 WORKDIR /app
 
 # Set environment for build
@@ -27,6 +35,10 @@ RUN npm run build
 
 # Stage 3: Runner
 FROM node:20-alpine AS runner
+
+# Install libc6-compat for Alpine (needed for Prisma)
+RUN apk add --no-cache libc6-compat
+
 WORKDIR /app
 
 ENV NODE_ENV=production
