@@ -30,12 +30,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch posts
+    // Fetch posts - show posts that have passed their publish delay
+    const now = new Date();
     const posts = await prisma.post.findMany({
       where: {
         company_id: company.id,
-        is_published: true,
         is_hidden: false,
+        // Show posts where publish_at has passed (auto-publish after 3 min delay)
+        OR: [
+          { is_published: true },
+          { publish_at: { lte: now } },
+        ],
       },
       take: limit,
       orderBy: [
